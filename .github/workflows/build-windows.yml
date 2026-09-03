@@ -25,6 +25,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          prefix-key: v2
 
       - name: Install Node.js
         uses: actions/setup-node@v4
