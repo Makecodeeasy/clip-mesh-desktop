@@ -36,6 +36,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Clean stale build script output
+        shell: pwsh
+        run: Remove-Item -Recurse -Force src-tauri\target\release\build\clip-mesh-desktop-* -ErrorAction SilentlyContinue
+
       - name: Build Tauri app
         run: npx tauri build
 
