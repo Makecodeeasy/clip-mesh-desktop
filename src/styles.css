@@ -1,0 +1,313 @@
+/* ============================================================
+   clip-mesh-desktop — 极简暗色主题样式
+   ============================================================ */
+
+:root {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-card: #0f3460;
+  --text-primary: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --accent: #00b4d8;
+  --accent-hover: #0096c7;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --border: #2a2a4a;
+  --radius: 8px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow-y: auto;
+}
+
+/* ---- 布局 ---- */
+
+.container {
+  padding: 20px 24px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* ---- 状态指示区 ---- */
+
+.status-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.status-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  min-width: 64px;
+}
+
+/* 状态指示灯 */
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.status-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.status-dot.disconnected {
+  background: var(--error);
+  box-shadow: 0 0 6px var(--error);
+}
+
+.status-dot.connecting {
+  background: var(--warning);
+  animation: pulse 1.2s infinite;
+}
+
+.status-dot.not-configured {
+  background: transparent;
+  border: 2px solid var(--text-secondary);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.status-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.device-id {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ---- 配置表单 ---- */
+
+.config-section {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.config-section h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.form-row {
+  margin-bottom: 10px;
+}
+
+.form-row label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus {
+  border-color: var(--accent);
+}
+
+.form-input-short {
+  width: 120px;
+}
+
+/* ---- 按钮 ---- */
+
+.actions-section {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.btn-secondary.active {
+  border-color: var(--warning);
+  color: var(--warning);
+}
+
+/* ---- 日志面板 ---- */
+
+.log-section {
+  margin-bottom: 14px;
+}
+
+.log-output {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  height: 120px;
+  overflow-y: auto;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-info {
+  color: #8b949e;
+}
+
+.log-warn {
+  color: var(--warning);
+}
+
+.log-error {
+  color: var(--error);
+}
+
+/* 滚动条美化 */
+.log-output::-webkit-scrollbar {
+  width: 4px;
+}
+
+.log-output::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.log-output::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ---- 页脚 ---- */
+
+.footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---- 通知弹窗 ---- */
+
+.notification {
+  position: fixed;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 9999;
+  transition: top 0.3s ease;
+}
+
+.notification.show {
+  top: 12px;
+}
+
+.notification.success {
+  background: var(--success);
+  color: #fff;
+}
+
+.notification.error {
+  background: var(--error);
+  color: #fff;
+}
