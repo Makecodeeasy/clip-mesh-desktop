@@ -1,0 +1,6 @@
+// Clip Mesh Desktop — Windows application manifest
+// 自定义 resource.rc：不含 ICON 引用，避免 rc.exe 对长路径/ICO 格式的兼容问题
+#include <winuser.h>
+
+// Application manifest — 启用视觉样式（Visual Styles / ComCtl32 v6）
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
