@@ -1,36 +1,69 @@
-name: Build Windows
+name: Build
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+          - platform: windows-latest
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust (MSVC toolchain)
+      # ---- Rust ----
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable-x86_64-pc-windows-msvc
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          prefix-key: v3
+          prefix-key: v4
 
+      # ---- Node.js ----
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Fix rc.exe (match architecture when replacing)
+      - name: Install frontend dependencies
+        run: npm install
+
+      # ---- macOS 特定步骤 ----
+      - name: Build Tauri app (macOS)
+        if: runner.os == 'macOS'
+        run: npx tauri build
+
+      - name: Upload macOS DMG
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClipMesh-macOS
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Upload macOS app
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClipMesh-macOS-app
+          path: src-tauri/target/release/bundle/macos/*.app
+
+      # ---- Windows 特定步骤 ----
+      - name: Fix rc.exe (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Continue"
@@ -51,7 +84,6 @@ jobs:
 
           Write-Host "Found $($allRcExes.Count) rc.exe instances:"
 
-          # 分类：提取版本号和架构（x86/x64/arm64）
           $sorted = $allRcExes | ForEach-Object {
             $ver = "0.0.0.0"
             if ($_.FullName -match '\\([\d]+\.[\d]+\.[\d]+\.[\d]+)\\') {
@@ -73,7 +105,6 @@ jobs:
             Write-Host "  [$($r.Version)] [$($r.Arch)] $($r.Path)"
           }
 
-          # 按架构分组，每种架构用最新的替换旧的
           $arches = $sorted | Select-Object -Property Arch -Unique
 
           foreach ($archGroup in $arches) {
@@ -109,21 +140,21 @@ jobs:
             }
           }
 
-          Write-Host "`nDone. All rc.exe should now be up to date."
+          Write-Host "`nDone."
 
-      - name: Install frontend dependencies
-        run: npm install
-
-      - name: Build Tauri app
+      - name: Build Tauri app (Windows)
+        if: runner.os == 'Windows'
         run: npx tauri build
 
-      - name: Upload MSI installer
+      - name: Upload Windows MSI
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ClipMesh-Windows-MSI
           path: src-tauri/target/release/bundle/msi/*.msi
 
-      - name: Upload NSIS installer
+      - name: Upload Windows NSIS
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ClipMesh-Windows-NSIS
