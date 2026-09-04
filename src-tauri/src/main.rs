@@ -114,7 +114,7 @@ fn start_p2p(
     };
 
     if config.encryption_key_hex.is_empty() {
-        return Err("请先设置加密密钥".to_string());
+        return Err("请先生成或输入连接码".to_string());
     }
 
     // H1 + C2: 取消旧任务（通过 token + abort 双保险）

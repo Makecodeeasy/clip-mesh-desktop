@@ -26,11 +26,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     appendLog("配置已加载", "info");
 
     // 根据配置有效性设置初始状态
-    if (!config.encryption_key_hex) {
+    if (!config.pairing_code) {
       updateStatusIndicator("not_configured");
-      appendLog("请填写加密密钥后点击「启动 P2P」", "info");
+      appendLog("请生成或输入连接码后点击「启动 P2P」", "info");
     } else {
       appendLog(`设备: ${config.device_name || config.device_id.substring(0, 8)}`, "info");
+      appendLog(`连接码: ${config.pairing_code}`, "info");
     }
   } catch (e) {
     appendLog(`加载配置失败: ${e}`, "error");

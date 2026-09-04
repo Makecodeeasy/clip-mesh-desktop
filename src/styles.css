@@ -180,6 +180,37 @@ body {
   width: 120px;
 }
 
+/* ---- 连接码 ---- */
+
+.pairing-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pairing-input {
+  flex: 1;
+  font-size: 20px !important;
+  letter-spacing: 6px;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 10px 12px !important;
+}
+
+.btn-generate {
+  flex-shrink: 0;
+  width: auto;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+
+.pairing-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
 /* ---- 已连接设备列表 ---- */
 
 .peers-section {

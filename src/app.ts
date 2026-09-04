@@ -2,7 +2,7 @@
  * clip-mesh-desktop — P2P 模式 UI 组件与交互逻辑
  *
  * 提供极简的配置界面，包含：
- * - 加密密钥输入
+ * - 连接码（一端生成，另一端输入，自动派生加密密钥）
  * - 设备名称
  * - 已连接设备列表
  * - 连接状态指示灯
@@ -19,6 +19,7 @@ export interface AppConfig {
   device_id: string;
   device_name: string;
   encryption_key_hex: string;
+  pairing_code: string;
   p2p_port: number;
   auto_start: boolean;
   sync_enabled: boolean;
@@ -59,13 +60,20 @@ export function initUI(): void {
         <h2>P2P 设置</h2>
 
         <div class="form-row">
-          <label for="input-enc-key">加密密钥 (Hex)</label>
-          <input
-            type="text"
-            id="input-enc-key"
-            placeholder="64 位十六进制字符（两端需相同）"
-            class="form-input"
-          />
+          <label>连接码</label>
+          <div class="pairing-row">
+            <input
+              type="text"
+              id="input-pairing-code"
+              placeholder="输入或生成"
+              class="form-input pairing-input"
+              maxlength="6"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="btn-generate-code" class="btn btn-secondary btn-generate">生成</button>
+          </div>
+          <div class="pairing-hint">一端点击生成，另一端输入相同连接码</div>
         </div>
 
         <div class="form-row">
@@ -122,6 +130,15 @@ function bindEvents(): void {
   const syncBtn = document.getElementById("btn-toggle-sync");
   syncBtn?.addEventListener("click", handleToggleSync);
 
+  const generateBtn = document.getElementById("btn-generate-code");
+  generateBtn?.addEventListener("click", handleGenerateCode);
+
+  // 连接码输入框：自动转大写
+  const codeInput = document.getElementById("input-pairing-code") as HTMLInputElement | null;
+  codeInput?.addEventListener("input", () => {
+    codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z2-9]/g, "");
+  });
+
   const inputs = document.querySelectorAll(".form-input");
   inputs.forEach((input) => {
     input.addEventListener("keydown", (e: Event) => {
@@ -143,27 +160,33 @@ async function handleStart(): Promise<void> {
   try {
     currentConfig = await invoke<AppConfig>("get_config");
   } catch {
-    currentConfig = { device_id: "", device_name: "", encryption_key_hex: "", p2p_port: 0, auto_start: true, sync_enabled: true };
+    currentConfig = { device_id: "", device_name: "", encryption_key_hex: "", pairing_code: "", p2p_port: 0, auto_start: true, sync_enabled: true };
   }
+
+  const pairingCode = getInputValue("input-pairing-code") || currentConfig.pairing_code;
+
+  if (!pairingCode) {
+    appendLog("请先生成或输入连接码", "error");
+    resetStartButton();
+    return;
+  }
+
+  // 从连接码派生 AES-256 加密密钥
+  const encryptionKeyHex = await deriveKey(pairingCode);
 
   const config: AppConfig = {
     device_id: currentConfig.device_id,
     device_name: getInputValue("input-device-name") || currentConfig.device_name,
-    encryption_key_hex: getInputValue("input-enc-key") || currentConfig.encryption_key_hex,
+    encryption_key_hex: encryptionKeyHex,
+    pairing_code: pairingCode,
     p2p_port: 0,
     auto_start: true,
     sync_enabled: true,
   };
 
-  if (!config.encryption_key_hex) {
-    appendLog("请填写加密密钥（两端需相同）", "error");
-    resetStartButton();
-    return;
-  }
-
   try {
     await invoke("update_config", { newConfig: config });
-    appendLog("配置已保存", "info");
+    appendLog(`连接码: ${pairingCode}，配置已保存`, "info");
 
     await invoke("start_p2p");
     appendLog("P2P 服务已启动，正在发现设备...", "info");
@@ -186,6 +209,41 @@ function resetStartButton(): void {
     startBtn.disabled = false;
     startBtn.textContent = "启动 P2P";
   }
+}
+
+// ============================================================
+// 连接码生成与密钥派生
+// ============================================================
+
+/** 连接码字符集（去掉易混淆字符 I/O/0/1） */
+const CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** 生成 6 位随机连接码并填入输入框 */
+function handleGenerateCode(): void {
+  const code = generatePairingCode();
+  setInputValue("input-pairing-code", code);
+  appendLog(`已生成连接码: ${code}，请在另一台设备输入`, "info");
+}
+
+function generatePairingCode(): string {
+  const array = new Uint8Array(6);
+  crypto.getRandomValues(array);
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += CODE_CHARSET[array[i] % CODE_CHARSET.length];
+  }
+  return code;
+}
+
+/** 从连接码派生 AES-256 密钥（SHA-256 → hex） */
+async function deriveKey(code: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(code);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = new Uint8Array(hashBuffer);
+  return Array.from(hashArray)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 async function handleToggleSync(): Promise<void> {
@@ -230,7 +288,7 @@ export function updateStatusIndicator(state: ConnectionState): void {
 }
 
 export function updateConfigForm(config: AppConfig): void {
-  setInputValue("input-enc-key", config.encryption_key_hex);
+  setInputValue("input-pairing-code", config.pairing_code);
   setInputValue("input-device-name", config.device_name);
 
   const deviceEl = document.getElementById("device-id");

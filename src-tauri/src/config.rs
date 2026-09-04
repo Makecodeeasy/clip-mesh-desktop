@@ -22,8 +22,12 @@ pub struct AppConfig {
     /// 本设备名称（用户可自定义）
     pub device_name: String,
 
-    /// AES-256 加密密钥（十六进制编码，两端需相同）
+    /// AES-256 加密密钥（十六进制编码，由 pairing_code 派生）
     pub encryption_key_hex: String,
+
+    /// 配对连接码（6 位，两端需相同）
+    #[serde(default)]
+    pub pairing_code: String,
 
     /// P2P WebSocket 监听端口（0 = 自动分配）
     #[serde(default)]
@@ -48,6 +52,7 @@ impl Default for AppConfig {
             device_id: generate_device_id(),
             device_name: get_hostname(),
             encryption_key_hex: String::new(),
+            pairing_code: String::new(),
             p2p_port: 0,
             auto_start: true,
             sync_enabled: true,
@@ -110,9 +115,9 @@ impl AppConfig {
         Ok(())
     }
 
-    /// 检查配置是否完整（加密密钥已设置）。
+    /// 检查配置是否完整（连接码已设置）。
     pub fn is_valid(&self) -> bool {
-        !self.encryption_key_hex.is_empty()
+        !self.pairing_code.is_empty() && !self.encryption_key_hex.is_empty()
     }
 }
 
