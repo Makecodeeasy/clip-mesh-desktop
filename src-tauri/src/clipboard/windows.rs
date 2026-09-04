@@ -31,8 +31,11 @@ use windows::Win32::{
         },
         Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
     },
-    UI::WindowsAndMessaging::CF_UNICODETEXT,
 };
+
+/// Win32 剪贴板格式常量（Unicode 文本）
+#[cfg(target_os = "windows")]
+const CF_UNICODETEXT: u32 = 13;
 
 use super::{ClipboardBackend, SuppressGuard};
 
@@ -162,7 +165,7 @@ impl ClipboardBackend for WindowsClipboard {
             let _ = GlobalUnlock(h_mem);
 
             // 将数据设置到剪贴板（系统接管内存生命周期）
-            if SetClipboardData(CF_UNICODETEXT, h_mem).is_err() {
+            if SetClipboardData(CF_UNICODETEXT, HANDLE(h_mem.0)).is_err() {
                 // 设置失败时需手动释放内存
                 let _ = GlobalFree(h_mem);
                 let _ = CloseClipboard();
