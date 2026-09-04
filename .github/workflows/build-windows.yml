@@ -1,10 +1,7 @@
 name: Build Windows
 
 on:
-  # 手动触发（在 GitHub Actions 页面点击 Run workflow）
   workflow_dispatch:
-
-  # 推送 v* 标签时自动触发（如 v1.0.0）
   push:
     tags:
       - "v*"
@@ -25,7 +22,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          prefix-key: v2
+          prefix-key: v3
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -33,12 +30,45 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Ensure modern rc.exe
+        shell: pwsh
+        run: |
+          # 问题：embed-resource crate 找到旧版 rc.exe (10.0.10011)，
+          # 无法处理标准 ICO 格式（RC2175 错误）。
+          # 方案：确保 PATH 中优先使用新版 rc.exe。
+
+          # 列出所有 rc.exe 并按版本号排序
+          $sdkBin = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $rcExes = Get-ChildItem -Path $sdkBin -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue |
+            ForEach-Object {
+              $ver = $_.FullName -replace '.*\\([\d.]+)\\.*','$1'
+              [PSCustomObject]@{ Path=$_.Directory.FullName; Version=$ver }
+            } | Sort-Object { [version]$_.Version } -Descending
+
+          Write-Host "Found rc.exe versions:"
+          $rcExes | ForEach-Object { Write-Host "  $($_.Version) -> $($_.Path)" }
+
+          if ($rcExes.Count -eq 0 -or [version]$rcExes[0].Version -lt [version]"10.0.19041.0") {
+            Write-Host "No modern rc.exe found, installing Windows 11 SDK..."
+            choco install windows-sdk-11 --no-progress -y
+            # 重新扫描
+            $rcExes = Get-ChildItem -Path $sdkBin -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue |
+              ForEach-Object {
+                $ver = $_.FullName -replace '.*\\([\d.]+)\\.*','$1'
+                [PSCustomObject]@{ Path=$_.Directory.FullName; Version=$ver }
+              } | Sort-Object { [version]$_.Version } -Descending
+          }
+
+          if ($rcExes.Count -gt 0) {
+            $newest = $rcExes[0]
+            Write-Host "`nUsing rc.exe $($newest.Version) from $($newest.Path)"
+            # 将新版 rc.exe 目录加到 PATH 最前面
+            echo "$($newest.Path)" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            echo "$($newest.Path)\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
       - name: Install frontend dependencies
         run: npm install
-
-      - name: Clean stale build script output
-        shell: pwsh
-        run: Remove-Item -Recurse -Force src-tauri\target\release\build\clip-mesh-desktop-* -ErrorAction SilentlyContinue
 
       - name: Build Tauri app
         run: npx tauri build
