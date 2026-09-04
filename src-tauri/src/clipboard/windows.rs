@@ -22,19 +22,16 @@
 //! - `CF_UNICODETEXT` 使用 UTF-16 LE 编码，需与 Rust String（UTF-8）互转。
 
 #[cfg(target_os = "windows")]
-use windows::{
-    core::PCWSTR,
-    Win32::{
-        Foundation::{HANDLE, HGLOBAL},
-        System::{
-            DataExchange::{
-                CloseClipboard, EmptyClipboard, GetClipboardData,
-                GetClipboardSequenceNumber, OpenClipboard, SetClipboardData,
-            },
-            Memory::{GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-            SystemServices::CF_UNICODETEXT,
+use windows::Win32::{
+    Foundation::{GlobalFree, HANDLE, HGLOBAL},
+    System::{
+        DataExchange::{
+            CloseClipboard, EmptyClipboard, GetClipboardData,
+            GetClipboardSequenceNumber, OpenClipboard, SetClipboardData,
         },
+        Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
     },
+    UI::WindowsAndMessaging::CF_UNICODETEXT,
 };
 
 use super::{ClipboardBackend, SuppressGuard};
@@ -82,7 +79,7 @@ impl ClipboardBackend for WindowsClipboard {
             };
 
             // 锁定全局内存，获取数据指针
-            let ptr = GlobalLock(h_data.0 as HGLOBAL);
+            let ptr = GlobalLock(HGLOBAL(h_data.0));
             if ptr.is_null() {
                 let _ = CloseClipboard();
                 return None;
@@ -100,7 +97,7 @@ impl ClipboardBackend for WindowsClipboard {
             let result = String::from_utf16_lossy(utf16_slice);
 
             // 解锁并关闭
-            let _ = GlobalUnlock(h_data.0 as HGLOBAL);
+            let _ = GlobalUnlock(HGLOBAL(h_data.0));
             let _ = CloseClipboard();
 
             Some(result)
@@ -165,7 +162,7 @@ impl ClipboardBackend for WindowsClipboard {
             let _ = GlobalUnlock(h_mem);
 
             // 将数据设置到剪贴板（系统接管内存生命周期）
-            if SetClipboardData(CF_UNICODETEXT, HANDLE(h_mem.0 as _)).is_err() {
+            if SetClipboardData(CF_UNICODETEXT, h_mem).is_err() {
                 // 设置失败时需手动释放内存
                 let _ = GlobalFree(h_mem);
                 let _ = CloseClipboard();
