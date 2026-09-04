@@ -47,8 +47,8 @@ pub fn build_system_tray() -> SystemTray {
     // 暂停/恢复剪贴板同步
     let pause_sync = CustomMenuItem::new("pause_sync", "暂停同步");
 
-    // 手动重新连接
-    let reconnect = CustomMenuItem::new("reconnect", "重新连接");
+    // 手动重新启动 P2P
+    let reconnect = CustomMenuItem::new("reconnect", "重新启动 P2P");
 
     // 状态子菜单（占位，运行时动态更新）
     let status_item = CustomMenuItem::new("status_display", "状态: 未连接").disabled();
@@ -60,7 +60,7 @@ pub fn build_system_tray() -> SystemTray {
     );
 
     // 关于
-    let about = CustomMenuItem::new("about", "关于 Clip Mesh v1.0.0");
+    let about = CustomMenuItem::new("about", "关于 Clip Mesh v2.0.0 (P2P)");
 
     // 退出
     let quit = CustomMenuItem::new("quit", "退出");
@@ -122,7 +122,7 @@ pub fn handle_tray_event(app: &AppHandle, event: SystemTrayEvent) {
                     use tauri::api::notification::Notification;
                     let _ = Notification::new(&app.config().tauri.bundle.identifier)
                         .title("Clip Mesh")
-                        .body("异构终端数据安全协同系统 v1.0.0\n© 2026 Makecodeeasy")
+                        .body("异构终端数据安全协同系统 v2.0.0 (P2P)\n© 2026 Makecodeeasy")
                         .show();
                 }
 

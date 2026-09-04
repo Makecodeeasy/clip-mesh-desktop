@@ -21,6 +21,7 @@ serde_json = "1.0"
 
 # ---- 异步运行时 ----
 tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
 
 # ---- WebSocket 客户端 ----
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
@@ -46,6 +47,11 @@ sha2 = "0.10"
 # ---- 编解码 ----
 base64 = "0.22"
 hex = "0.4"
+
+# ---- mDNS 服务发现 (P2P) ----
+mdns-sd = "0.11"
+local-ip-address = "0.6"
+hostname = "0.4"
 
 # ---- 配置持久化 ----
 dirs = "5.0"

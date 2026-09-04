@@ -100,8 +100,9 @@ impl ClipboardMonitor {
                         // 发送到事件通道（若通道满则丢弃，避免阻塞）
                         match self.event_tx.try_send(event) {
                             Ok(_) => {
-                                let preview = if text.len() > 50 {
-                                    format!("{}...", &text[..50])
+                                let preview: String = if text.chars().count() > 50 {
+                                    let p: String = text.chars().take(50).collect();
+                                    format!("{}...", p)
                                 } else {
                                     text.clone()
                                 };

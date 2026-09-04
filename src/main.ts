@@ -8,7 +8,7 @@
 
 import { invoke } from "@tauri-apps/api/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { AppConfig, initUI, updateStatusIndicator, updateConfigForm, appendLog, showSyncToast } from "./app";
+import { AppConfig, initUI, updateStatusIndicator, updateConfigForm, addPeer, removePeer, appendLog, showSyncToast } from "./app";
 import "./styles.css";
 
 // ============================================================
@@ -26,11 +26,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     appendLog("配置已加载", "info");
 
     // 根据配置有效性设置初始状态
-    if (!config.server_ip || !config.auth_token) {
+    if (!config.encryption_key_hex) {
       updateStatusIndicator("not_configured");
-      appendLog("请填写服务器配置后点击「连接」", "info");
+      appendLog("请填写加密密钥后点击「启动 P2P」", "info");
     } else {
-      appendLog(`服务器: ${config.server_ip}:${config.server_port}`, "info");
+      appendLog(`设备: ${config.device_name || config.device_id.substring(0, 8)}`, "info");
     }
   } catch (e) {
     appendLog(`加载配置失败: ${e}`, "error");
@@ -59,23 +59,32 @@ function registerEventListeners() {
     // 映射 Rust 状态字符串到 UI 状态
     if (state === "Connected") {
       updateStatusIndicator("connected");
-      appendLog("已连接到服务端 ✓", "info");
+      appendLog("已连接到对等设备 ✓", "info");
     } else if (state === "Disconnected") {
       updateStatusIndicator("disconnected");
       appendLog("连接已断开", "warn");
-    } else if (state === "Connecting") {
-      updateStatusIndicator("connecting");
-      appendLog("正在建立连接...", "info");
+    } else if (state === "Listening") {
+      updateStatusIndicator("listening");
+      appendLog("P2P 服务已启动，等待设备发现...", "info");
     } else if (state === "NotConfigured") {
       updateStatusIndicator("not_configured");
-    } else if (state.startsWith("Reconnecting")) {
-      updateStatusIndicator("connecting");
-      // 从 "Reconnecting(3)" 中提取重试次数
-      const match = state.match(/\((\d+)\)/);
-      const attempt = match ? match[1] : "?";
-      appendLog(`连接失败，第 ${attempt} 次重试中...`, "warn");
     }
   });
+
+  // 对等设备事件（连接/断开）
+  listen<{ type: string; device_id: string; device_name?: string }>(
+    "peer-event",
+    (event) => {
+      const { type, device_id, device_name } = event.payload;
+      if (type === "connected" && device_name) {
+        addPeer(device_id, device_name);
+        appendLog(`设备已连接: ${device_name}`, "info");
+      } else if (type === "disconnected") {
+        removePeer(device_id);
+        appendLog(`设备已断开: ${device_id.substring(0, 8)}`, "warn");
+      }
+    }
+  );
 
   // 配置更新通知
   listen<AppConfig>("config-updated", (event) => {
@@ -87,6 +96,18 @@ function registerEventListeners() {
   listen("sync-toggle", () => {
     console.log("[Frontend] Sync toggle event received");
     refreshSyncStatus();
+  });
+
+  // 托盘菜单「重新启动 P2P」
+  listen("reconnect-request", async () => {
+    console.log("[Frontend] Reconnect (restart P2P) requested from tray");
+    appendLog("从托盘重新启动 P2P...", "info");
+    try {
+      await invoke("start_p2p");
+      appendLog("P2P 服务已重新启动", "info");
+    } catch (e) {
+      appendLog(`重新启动失败: ${e}`, "error");
+    }
   });
 
   // 剪贴板同步提示
