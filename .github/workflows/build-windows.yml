@@ -30,42 +30,77 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Ensure modern rc.exe
+      - name: Fix rc.exe (embed-resource picks up ancient 10.0.10011 version)
         shell: pwsh
         run: |
-          # 问题：embed-resource crate 找到旧版 rc.exe (10.0.10011)，
-          # 无法处理标准 ICO 格式（RC2175 错误）。
-          # 方案：确保 PATH 中优先使用新版 rc.exe。
+          # embed-resource crate 通过 vswhom 找到旧版 rc.exe (10.0.10011)，
+          # 该版本无法处理标准 ICO 文件（RC2175 错误）。
+          # 策略：找到系统中所有 rc.exe，用最新版物理替换旧版。
 
-          # 列出所有 rc.exe 并按版本号排序
-          $sdkBin = "C:\Program Files (x86)\Windows Kits\10\bin"
-          $rcExes = Get-ChildItem -Path $sdkBin -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue |
-            ForEach-Object {
-              $ver = $_.FullName -replace '.*\\([\d.]+)\\.*','$1'
-              [PSCustomObject]@{ Path=$_.Directory.FullName; Version=$ver }
-            } | Sort-Object { [version]$_.Version } -Descending
+          $searchPaths = @(
+            "C:\Program Files (x86)\Windows Kits",
+            "C:\Program Files\Windows Kits",
+            "C:\Program Files (x86)\Microsoft Visual Studio",
+            "C:\Program Files\Microsoft Visual Studio"
+          )
 
-          Write-Host "Found rc.exe versions:"
-          $rcExes | ForEach-Object { Write-Host "  $($_.Version) -> $($_.Path)" }
-
-          if ($rcExes.Count -eq 0 -or [version]$rcExes[0].Version -lt [version]"10.0.19041.0") {
-            Write-Host "No modern rc.exe found, installing Windows 11 SDK..."
-            choco install windows-sdk-11 --no-progress -y
-            # 重新扫描
-            $rcExes = Get-ChildItem -Path $sdkBin -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue |
-              ForEach-Object {
-                $ver = $_.FullName -replace '.*\\([\d.]+)\\.*','$1'
-                [PSCustomObject]@{ Path=$_.Directory.FullName; Version=$ver }
-              } | Sort-Object { [version]$_.Version } -Descending
+          $allRcExes = @()
+          foreach ($p in $searchPaths) {
+            if (Test-Path $p) {
+              $found = Get-ChildItem -Path $p -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue
+              $allRcExes += $found
+            }
           }
 
-          if ($rcExes.Count -gt 0) {
-            $newest = $rcExes[0]
-            Write-Host "`nUsing rc.exe $($newest.Version) from $($newest.Path)"
-            # 将新版 rc.exe 目录加到 PATH 最前面
-            echo "$($newest.Path)" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            echo "$($newest.Path)\x64" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "Found $($allRcExes.Count) rc.exe instances:"
+          $sorted = $allRcExes | ForEach-Object {
+            $ver = "0.0.0.0"
+            if ($_.FullName -match '\\([\d]+\.[\d]+\.[\d]+\.[\d]+)\\') {
+              $ver = $Matches[1]
+            } elseif ($_.FullName -match '\\([\d]+\.[\d]+\.[\d]+)\\') {
+              $ver = "$($Matches[1]).0"
+            }
+            [PSCustomObject]@{ Path=$_.FullName; Dir=$_.Directory.FullName; Version=$ver }
+          } | Sort-Object { [version]$_.Version } -Descending
+
+          foreach ($r in $sorted) {
+            Write-Host "  [$($r.Version)] $($r.Path)"
           }
+
+          if ($sorted.Count -lt 2) {
+            Write-Host "Only one rc.exe found, no replacement possible"
+            exit 0
+          }
+
+          $newest = $sorted[0]
+          $oldest = $sorted[-1]
+
+          if ([version]$newest.Version -le [version]$oldest.Version) {
+            Write-Host "All rc.exe are same version, nothing to do"
+            exit 0
+          }
+
+          Write-Host "`nReplacing old rc.exe:"
+          Write-Host "  From: $($newest.Dir) (v$($newest.Version))"
+          Write-Host "  To:   $($oldest.Dir) (v$($oldest.Version))"
+
+          # 替换旧版目录中的所有文件
+          foreach ($file in (Get-ChildItem -Path $newest.Dir -File)) {
+            $dest = Join-Path $oldest.Dir $file.Name
+            try {
+              Copy-Item $file.FullName $dest -Force -ErrorAction Stop
+              Write-Host "  OK: $($file.Name)"
+            } catch {
+              takeown /f $dest /a 2>$null | Out-Null
+              icacls $dest /grant "Administrators:F" 2>$null | Out-Null
+              Copy-Item $file.FullName $dest -Force
+              Write-Host "  OK (elevated): $($file.Name)"
+            }
+          }
+
+          # 验证替换结果
+          Write-Host "`nVerification:"
+          & "$(Join-Path $oldest.Dir 'rc.exe')" 2>&1 | Select-Object -First 3
 
       - name: Install frontend dependencies
         run: npm install
