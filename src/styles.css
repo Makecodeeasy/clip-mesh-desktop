@@ -283,6 +283,43 @@ body {
   gap: 8px;
 }
 
+/* ---- 同步提示 Toast ---- */
+
+.sync-toast {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-primary);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 999;
+}
+
+.sync-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.sync-toast .toast-icon {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sync-toast .toast-preview {
+  color: var(--text-secondary);
+}
+
 /* ---- 通知弹窗 ---- */
 
 .notification {

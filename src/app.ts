@@ -135,6 +135,9 @@ export function initUI(): void {
         <span>·</span>
         <span id="sync-status">未同步</span>
       </footer>
+
+      <!-- 同步提示 toast -->
+      <div id="sync-toast" class="sync-toast"></div>
     </div>
   `;
 
@@ -353,6 +356,40 @@ export function appendLog(message: string, level: "info" | "error" | "warn"): vo
   while (logEl.children.length > 50) {
     logEl.removeChild(logEl.firstChild!);
   }
+}
+
+// ============================================================
+// 同步提示 Toast
+// ============================================================
+
+/**
+ * 显示剪贴板同步提示。
+ *
+ * @param direction - "out" 表示已发送，"in" 表示已接收
+ * @param preview - 文本预览（前 20 字符）
+ * @param senderId - 发送方设备 ID（仅 "in" 方向）
+ */
+export function showSyncToast(direction: "in" | "out", preview: string, senderId?: string): void {
+  const toast = document.getElementById("sync-toast");
+  if (!toast) return;
+
+  const icon = direction === "out" ? "↑" : "↓";
+  const label = direction === "out" ? "已发送" : "已接收";
+  const source = direction === "in" && senderId
+    ? ` · 来自 ${senderId.substring(0, 8)}`
+    : "";
+
+  // 截断预览文本并转义
+  const text = preview.replace(/\n/g, " ").substring(0, 30);
+
+  toast.innerHTML = `<span class="toast-icon">${icon}</span> ${label}${source} · <span class="toast-preview">${text}</span>`;
+  toast.classList.add("show");
+
+  // 2 秒后自动隐藏
+  clearTimeout((toast as any)._hideTimer);
+  (toast as any)._hideTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2000);
 }
 
 // ============================================================

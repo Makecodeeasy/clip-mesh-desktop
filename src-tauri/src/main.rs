@@ -338,6 +338,7 @@ async fn run_core_services(config: AppConfig, app_handle: tauri::AppHandle) {
     // ---- 本地→远端同步任务 ----
     let cipher_send = cipher.clone();
     let device_id_send = config.device_id.clone();
+    let handle_send = app_handle.clone();
 
     let send_task = tokio::spawn(async move {
         while let Some(event) = clipboard_rx.recv().await {
@@ -370,6 +371,15 @@ async fn run_core_services(config: AppConfig, app_handle: tauri::AppHandle) {
                         log::error!("[Sync→] Failed to send: {}", e);
                     } else {
                         log::info!("[Sync→] Clipboard sent ({} chars)", event.text.len());
+                        // 通知前端显示同步提示
+                        let preview: String = event.text.chars().take(20).collect();
+                        if let Some(window) = handle_send.get_window("main") {
+                            let _ = window.emit("clipboard-synced", serde_json::json!({
+                                "direction": "out",
+                                "preview": preview,
+                                "chars": event.text.len(),
+                            }));
+                        }
                     }
                 }
                 Err(e) => {
@@ -382,6 +392,7 @@ async fn run_core_services(config: AppConfig, app_handle: tauri::AppHandle) {
     // ---- 远端→本地同步任务 ----
     let cipher_recv = cipher.clone();
     let device_id_recv = config.device_id.clone();
+    let handle_recv = app_handle.clone();
 
     let recv_task = tokio::spawn(async move {
         while let Some(msg) = incoming_rx.recv().await {
@@ -421,6 +432,16 @@ async fn run_core_services(config: AppConfig, app_handle: tauri::AppHandle) {
                                 msg.sender_id,
                                 plaintext.len()
                             );
+                            // 通知前端显示同步提示
+                            let preview: String = plaintext.chars().take(20).collect();
+                            if let Some(window) = handle_recv.get_window("main") {
+                                let _ = window.emit("clipboard-synced", serde_json::json!({
+                                    "direction": "in",
+                                    "sender_id": &msg.sender_id,
+                                    "preview": preview,
+                                    "chars": plaintext.len(),
+                                }));
+                            }
                         }
                         Err(e) => {
                             log::error!("[Sync←] Failed to write clipboard: {}", e);

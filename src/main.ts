@@ -8,7 +8,7 @@
 
 import { invoke } from "@tauri-apps/api/tauri";
 import { listen } from "@tauri-apps/api/event";
-import { AppConfig, initUI, updateStatusIndicator, updateConfigForm, appendLog } from "./app";
+import { AppConfig, initUI, updateStatusIndicator, updateConfigForm, appendLog, showSyncToast } from "./app";
 import "./styles.css";
 
 // ============================================================
@@ -88,6 +88,17 @@ function registerEventListeners() {
     console.log("[Frontend] Sync toggle event received");
     refreshSyncStatus();
   });
+
+  // 剪贴板同步提示
+  listen<{ direction: "in" | "out"; sender_id?: string; preview: string; chars: number }>(
+    "clipboard-synced",
+    (event) => {
+      const { direction, sender_id, preview, chars } = event.payload;
+      const label = direction === "out" ? "已发送" : "已接收";
+      appendLog(`${label} ${chars} 字符${direction === "in" && sender_id ? ` (来自 ${sender_id.substring(0, 8)})` : ""}`, "info");
+      showSyncToast(direction, preview, sender_id);
+    }
+  );
 }
 
 /**
