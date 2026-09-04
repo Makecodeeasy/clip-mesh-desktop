@@ -30,13 +30,12 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Fix rc.exe (embed-resource picks up ancient 10.0.10011 version)
+      - name: Fix rc.exe (replace ALL old versions with newest)
         shell: pwsh
         run: |
-          # embed-resource crate 通过 vswhom 找到旧版 rc.exe (10.0.10011)，
-          # 该版本无法处理标准 ICO 文件（RC2175 错误）。
-          # 策略：找到系统中所有 rc.exe，用最新版物理替换旧版。
+          $ErrorActionPreference = "Continue"
 
+          # 扫描系统中所有 rc.exe
           $searchPaths = @(
             "C:\Program Files (x86)\Windows Kits",
             "C:\Program Files\Windows Kits",
@@ -47,60 +46,71 @@ jobs:
           $allRcExes = @()
           foreach ($p in $searchPaths) {
             if (Test-Path $p) {
-              $found = Get-ChildItem -Path $p -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue
-              $allRcExes += $found
+              $allRcExes += Get-ChildItem -Path $p -Filter "rc.exe" -Recurse -ErrorAction SilentlyContinue
             }
           }
 
           Write-Host "Found $($allRcExes.Count) rc.exe instances:"
+
+          # 提取版本号并排序
           $sorted = $allRcExes | ForEach-Object {
             $ver = "0.0.0.0"
             if ($_.FullName -match '\\([\d]+\.[\d]+\.[\d]+\.[\d]+)\\') {
               $ver = $Matches[1]
-            } elseif ($_.FullName -match '\\([\d]+\.[\d]+\.[\d]+)\\') {
-              $ver = "$($Matches[1]).0"
             }
-            [PSCustomObject]@{ Path=$_.FullName; Dir=$_.Directory.FullName; Version=$ver }
+            [PSCustomObject]@{
+              Path    = $_.FullName
+              Dir     = $_.Directory.FullName
+              Version = $ver
+            }
           } | Sort-Object { [version]$_.Version } -Descending
 
           foreach ($r in $sorted) {
             Write-Host "  [$($r.Version)] $($r.Path)"
           }
 
-          if ($sorted.Count -lt 2) {
-            Write-Host "Only one rc.exe found, no replacement possible"
-            exit 0
+          if ($sorted.Count -eq 0) {
+            Write-Host "ERROR: No rc.exe found!"
+            exit 1
           }
 
           $newest = $sorted[0]
-          $oldest = $sorted[-1]
+          Write-Host "`nNewest: v$($newest.Version) at $($newest.Dir)"
 
-          if ([version]$newest.Version -le [version]$oldest.Version) {
-            Write-Host "All rc.exe are same version, nothing to do"
-            exit 0
-          }
-
-          Write-Host "`nReplacing old rc.exe:"
-          Write-Host "  From: $($newest.Dir) (v$($newest.Version))"
-          Write-Host "  To:   $($oldest.Dir) (v$($oldest.Version))"
-
-          # 替换旧版目录中的所有文件
-          foreach ($file in (Get-ChildItem -Path $newest.Dir -File)) {
-            $dest = Join-Path $oldest.Dir $file.Name
-            try {
-              Copy-Item $file.FullName $dest -Force -ErrorAction Stop
-              Write-Host "  OK: $($file.Name)"
-            } catch {
-              takeown /f $dest /a 2>$null | Out-Null
-              icacls $dest /grant "Administrators:F" 2>$null | Out-Null
-              Copy-Item $file.FullName $dest -Force
-              Write-Host "  OK (elevated): $($file.Name)"
+          # 用最新的 rc.exe 替换所有其他版本
+          $replaced = 0
+          foreach ($rc in ($sorted | Select-Object -Skip 1)) {
+            if ($rc.Dir -eq $newest.Dir) { continue }
+            Write-Host "`nReplacing in: $($rc.Dir) (v$($rc.Version))"
+            foreach ($file in (Get-ChildItem -Path $newest.Dir -File)) {
+              $dest = Join-Path $rc.Dir $file.Name
+              try {
+                Copy-Item $file.FullName $dest -Force -ErrorAction Stop
+                Write-Host "  OK: $($file.Name)"
+                $replaced++
+              } catch {
+                try {
+                  takeown /f $dest /a 2>$null | Out-Null
+                  icacls $dest /grant "Administrators:F" 2>$null | Out-Null
+                  Copy-Item $file.FullName $dest -Force
+                  Write-Host "  OK (elevated): $($file.Name)"
+                  $replaced++
+                } catch {
+                  Write-Host "  SKIP: $($file.Name) - $($_.Exception.Message)"
+                }
+              }
             }
           }
 
-          # 验证替换结果
-          Write-Host "`nVerification:"
-          & "$(Join-Path $oldest.Dir 'rc.exe')" 2>&1 | Select-Object -First 3
+          Write-Host "`nReplaced $replaced files across $($sorted.Count - 1) directories"
+
+          # 特别验证 Windows Kits 10.0.10011（embed-resource 用的那个）
+          $problemDir = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.10011.0\x86"
+          if (Test-Path "$problemDir\rc.exe") {
+            Write-Host "`nVerifying $problemDir\rc.exe :"
+            $bytes = [System.IO.File]::ReadAllBytes("$problemDir\rc.exe")
+            Write-Host "  File size: $($bytes.Length) bytes"
+          }
 
       - name: Install frontend dependencies
         run: npm install
